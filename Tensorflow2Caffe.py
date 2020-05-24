@@ -8,32 +8,6 @@ import os
 TAG = 'tsfw'
 import cv2
 
-
-# meta='alexnet/model/alexnet_10000.ckpt.meta'
-# ckpt='alexnet/model/alexnet_10000.ckpt'
-# meta='backup/model-20170512-110547.meta'
-# ckpt='backup/model-20170512-110547.ckpt-250000.data-00000-of-00001'
-# meta='lenetmodel/lenet_40000.ckpt.meta'
-# ckpt='lenetmodel/lenet_40000.ckpt'
-
-# meta='testmodel/cov/cov_model.meta'
-# ckpt='testmodel/cov/cov_model'
-# meta='/home/lucky/tensorflow/squeezeDet/data/model_checkpoints/squeezeDetPlus/model.ckpt-95000.meta'
-# ckpt='/home/lucky/tensorflow/squeezeDet/data/model_checkpoints/squeezeDetPlus/model.ckpt-95000'
-# meta='/home/lucky/tensorflow/squeezeDet/data/model_checkpoints/vgg16/model.ckpt-101500.meta'
-# ckpt='/home/lucky/tensorflow/squeezeDet/data/model_checkpoints/vgg16/model.ckpt-101500'
-# meta='/home/lucky/PycharmProjects/tensorflow2caffe/ssd_mobilenet_v1_coco_2017_11_17/model.ckpt.meta'
-# ckpt='/home/lucky/PycharmProjects/tensorflow2caffe/ssd_mobilenet_v1_coco_2017_11_17/model.ckpt'
-# meta='mtcnn_tf/Pnet/PNet-30.meta'
-# ckpt='mtcnn_tf/Pnet/PNet-30'
-# meta='mtcnn_tf/Onet/ONet-22.meta'
-# ckpt='mtcnn_tf/Onet/ONet-22'
-# meta='backup/sepatate/pnet/pnet-3000000.meta'
-# ckpt='backup/sepatate/pnet/pnet-3000000'
-# pb='openpose/mobilenet_thin/graph_freeze.pb'
-# meta='model-ssd-openpose/model-388003.meta'
-# ckpt='model-ssd-openpose/model-388003'
-
 class Tensorflow2Caffe(object):
     def __init__(self, meta=None, ckpt=None, pb=None, ROTATION=False, filepath='./', netname='test', INPLACE=False,
                  RELU6=True):
@@ -83,13 +57,10 @@ class Tensorflow2Caffe(object):
         layer.name = input_name_input + TAG
         inputshape = shape[:]
         inputshape[axis] = 1
-        print(inputshape)
         layer.top.append(self.get_realname(layer.name))
         self.toplist.append(self.get_realname(layer.name))
-
         if len(inputshape) == 4:
             inputshape[0] = 1
-
         keys['shape'] = inputshape
         layer.input_param.append(keys)
         self.layers.append(layer)
@@ -124,16 +95,13 @@ class Tensorflow2Caffe(object):
     def get_realname(self, name):
         name = name.split(':')[0]
         if not self.pointnames:
-            temp = []
-            temp.append(name)
-
+            temp = [name]
             self.pointnames.append(temp)
             return name
         for i in self.pointnames:
             if name in i:
                 return i[0]
-        temp = []
-        temp.append(name)
+        temp = [name]
         # if 'read' not in name:
         self.pointnames.append(temp)
         return name
@@ -144,16 +112,12 @@ class Tensorflow2Caffe(object):
         name = name.split(':')[0]
         name0 = name0.split(':')[0]
         if not self.pointnames:
-            temp = []
-            temp.append(name)
-            temp.append(name0)
+            temp = [name, name0]
             self.pointnames.append(temp)
         for i in range(len(self.pointnames)):
             if name in self.pointnames[i]:
                 self.pointnames[i].append(name0)
-        temp = []
-        temp.append(name)
-        temp.append(name0)
+        temp = [name, name0]
         self.pointnames.append(temp)
 
     def get_transform(self, name):
@@ -190,7 +154,7 @@ class Tensorflow2Caffe(object):
             ff.close()
         Batch_normal_dict = ['Add', 'Rsqrt', 'Mul', 'Mul', 'Mul', 'Sub', 'Add']
         Prelu_dict = ['Relu', 'Abs', 'Sub', 'Mul', 'Mul', 'Add']
-        Batch_normal_index = 0
+        batch_normal_index = 0
         Prelu_index = 0
         prelu_alphas_name = ''
         belta_name = ''
@@ -332,7 +296,6 @@ class Tensorflow2Caffe(object):
                 caffe_shape_temp = [1, 1, 1, 1]
                 caffe_kernel_shape_temp = [1, 1, 1, 1]
                 for j in i.inputs:
-                    # print('111222',j)
                     if '/read' not in j.name:
                         if self.IMAGE == True:
                             j_temp = self.sess.run(j, feed_dict=self.feed_dict)
@@ -361,11 +324,12 @@ class Tensorflow2Caffe(object):
                         pad_2 = kernel_shape_temp[0] - 1
                         pad_1 = kernel_shape_temp[1] - 1
                     else:
-
-                        pad_1 = int(math.ceil(shape_temp[1] / stride_h) - math.floor(
+                        pad_2 = (shape_temp[2] / stride_w - 1) * stride_w + kernel_shape_temp[1] - shape_temp[2]
+                        pad_1 = (shape_temp[1] / stride_h - 1) * stride_h + kernel_shape_temp[0] - shape_temp[1]
+                        '''pad_1 = int(math.ceil(shape_temp[1] / stride_h) - math.floor(
                             ((shape_temp[1]) - (kernel_shape_temp[0]) + 1) / stride_h) + 0.999)
                         pad_2 = int(math.ceil(shape_temp[2] / stride_w) - math.floor(
-                            ((shape_temp[2]) - (kernel_shape_temp[1]) + 1) / stride_w) + 0.999)
+                            ((shape_temp[2]) - (kernel_shape_temp[1]) + 1) / stride_w) + 0.999)'''
 
                     if pad_1 != pad_2:
                         keys['pad_h'] = int((pad_1 + 1) / 2)
@@ -374,7 +338,7 @@ class Tensorflow2Caffe(object):
                         layer.pad = pad_1 + 1
                         keys['pad'] = int(layer.pad / 2)
                 input_len = len(i.inputs)
-                if (input_len == 2):
+                if input_len == 2:
                     layer.kernel_size = i.inputs[1].shape[0]
                 out_num = 0
                 for j in i.outputs:
@@ -431,8 +395,6 @@ class Tensorflow2Caffe(object):
                         shape_temp = self.sess.run(tf.shape(j), feed_dict=self.feed_dict)
                     else:
                         shape_temp = [int(m) for m in j.shape]
-                    print(shape_temp)
-                    print(self.get_realname('scale0_' + j.name))
                     self.toplist.append(self.get_realname('scale0_' + j.name))
                 for j in i.inputs:
                     if self.get_realname(j.name.encode()) not in self.toplist:
@@ -460,8 +422,6 @@ class Tensorflow2Caffe(object):
                 # keys['bias_term'] = 'false'
                 # layer.scale_param.append(keys)
                 self.layers.append(layer)
-
-                keys = {}
                 layer = writecaffe.ReLULayer()
                 layer.name = i.name.encode() + '_relu0' + TAG
                 for j in i.outputs:
@@ -494,7 +454,6 @@ class Tensorflow2Caffe(object):
 
                 layer = writecaffe.BaisLayer()
                 layer.name = i.name.encode() + '_bais1'
-                keys = {}
                 for j in i.outputs:
                     layer.top.append(self.get_realname('bais1_' + j.name))
 
@@ -506,8 +465,6 @@ class Tensorflow2Caffe(object):
                 cost_temp = 6.0 * np.ones((shape_temp[3]))
                 self.ConstWeight_dict[i.name.encode() + '_bais1'] = [layer.name, 0, cost_temp]
                 self.layers.append(layer)
-
-                keys = {}
                 layer = writecaffe.ReLULayer()
                 layer.name = i.name.encode() + '_relu1' + TAG
                 for j in i.outputs:
@@ -545,15 +502,11 @@ class Tensorflow2Caffe(object):
                 layer.name = i.name + TAG
                 for j in i.outputs:
                     layer.top.append(self.get_realname(j.name))
-                    # print(j.shape[0])
                     self.toplist.append(self.get_realname(j.name))
-                    # print(j)
-                    # print(j.name)
                 for j in i.inputs:
                     if self.get_realname(j.name) not in self.toplist:
                         continue
                     layer.bottom.append(self.get_realname(j.name))
-                # layer.relu_param.append(keys)
                 self.layers.append(layer)
                 continue
             if i.type == 'DepthwiseConv2dNative':
@@ -562,10 +515,7 @@ class Tensorflow2Caffe(object):
                 layer.name = i.name + TAG
                 for j in i.outputs:
                     layer.top.append(self.get_realname(j.name))
-                    # print(j.shape[0])
                     self.toplist.append(self.get_realname(j.name))
-                    # print(j)
-                    # print(j.name)
                 shape_temp = [1, 1, 1, 1]
                 kernel_shape_temp = [1, 1, 1, 1]
                 caffe_shape_temp = [1, 1, 1, 1]
@@ -579,8 +529,6 @@ class Tensorflow2Caffe(object):
                             shape_temp = [int(m) for m in j.shape]
                     else:
                         kernel_shape_temp = [int(m) for m in j.shape]
-
-                    # if self.get_realname(j.name) not in self.toplist:
                     if '/read:0' in j.name:
                         name_temp = j.name.encode()
                         name_temp = str.split(name_temp, ':')[0]
@@ -590,7 +538,6 @@ class Tensorflow2Caffe(object):
                     layer.bottom.append(self.get_realname(j.name))
                 caffe_shape_temp = [shape_temp[0], shape_temp[3], shape_temp[1], shape_temp[2]]
                 stride = [float(m) for m in i.get_attr('strides')]
-                # print(stride)
                 layer.stride = stride[2]
                 stride_h = stride[1]
                 stride_w = stride[2]
@@ -606,10 +553,12 @@ class Tensorflow2Caffe(object):
                         #      (math.ceil(((shape_temp[1]) - (kernel_shape_temp[0]) + 1) / stride_h)),
                         #      math.ceil(shape_temp[1] / stride_h) - (
                         #          math.ceil((shape_temp[1]) - (kernel_shape_temp[0]) + 1) / stride_h))
-                        pad_1 = int(math.ceil(shape_temp[1] / stride_h) - math.floor(
+                        '''pad_1 = int(math.ceil(shape_temp[1] / stride_h) - math.floor(
                             ((shape_temp[1]) - (kernel_shape_temp[0]) + 1) / stride_h) + 0.999)
                         pad_2 = int(math.ceil(shape_temp[2] / stride_w) - math.floor(
-                            ((shape_temp[2]) - (kernel_shape_temp[1]) + 1) / stride_w) + 0.999)
+                            ((shape_temp[2]) - (kernel_shape_temp[1]) + 1) / stride_w) + 0.999)'''
+                        pad_2 = (shape_temp[2] / stride_w - 1) * stride_w + kernel_shape_temp[1] - shape_temp[2]
+                        pad_1 = (shape_temp[1] / stride_h - 1) * stride_h + kernel_shape_temp[0] - shape_temp[1]
                     if pad_1 != pad_2:
                         keys['pad_h'] = int((pad_1 + 1) / 2)
                         keys['pad_w'] = int((pad_2 + 1) / 2)
@@ -639,43 +588,31 @@ class Tensorflow2Caffe(object):
                 self.layers.append(layer)
                 continue
             if i.type == 'Concat':
-                # print(i)
-                # assert 0
                 keys = {}
                 layer = writecaffe.ConcatLayer()
                 layer.name = i.name + TAG
                 for j in i.outputs:
                     layer.top.append(self.get_realname(j.name))
-                    # print(j.shape[0])
                     self.toplist.append(self.get_realname(j.name))
-                    # print(j)
-                    # print(j.name)
                 for j in i.inputs:
                     if self.get_realname(j.name) not in self.toplist:
                         continue
                     layer.bottom.append(self.get_realname(j.name))
-                # layer.relu_param.append(keys)
                 keys['axis'] = layer.axis
                 layer.concat_param.append(keys)
                 self.layers.append(layer)
                 continue
             if i.type == 'ConcatV2':
-                # print(i)
-                # assert 0
                 keys = {}
                 layer = writecaffe.ConcatLayer()
                 layer.name = i.name + TAG
                 for j in i.outputs:
                     layer.top.append(self.get_realname(j.name))
-                    # print(j.shape[0])
                     self.toplist.append(self.get_realname(j.name))
-                    # print(j)
-                    # print(j.name)
                 for j in i.inputs:
                     if self.get_realname(j.name) not in self.toplist:
                         continue
                     layer.bottom.append(self.get_realname(j.name))
-                # layer.relu_param.append(keys)
                 if self.IMAGE == True:
                     axis = self.sess.run(i.inputs[-1], feed_dict=self.feed_dict)
                     print(axis)
@@ -686,8 +623,7 @@ class Tensorflow2Caffe(object):
                 self.layers.append(layer)
                 continue
             if i.type == 'FusedBatchNorm':
-
-                Batch_normal_index = 0
+                batch_normal_index = 0
                 keys = {}
                 layer = writecaffe.BatchnormalLayer()
                 layer.name = i.name + TAG
@@ -704,7 +640,6 @@ class Tensorflow2Caffe(object):
                     if self.get_realname(j.name) not in self.toplist:
                         continue
                     layer.bottom.append(self.get_realname(j.name))
-                # layer.relu_param.append(keys)
                 try:
                     mean_ = graph.get_tensor_by_name(moving_mean)
                     variance_ = graph.get_tensor_by_name(moving_variance)
@@ -733,8 +668,6 @@ class Tensorflow2Caffe(object):
                     keys['eps'] = str(eps)
 
                 self.layers.append(layer)
-
-                # scale
                 layer = writecaffe.ScaleLayer()
                 layer.name = i.name.encode() + '_scale' + TAG
                 keys = {}
@@ -755,18 +688,13 @@ class Tensorflow2Caffe(object):
                 self.layers.append(layer)
                 continue
             if i.type == 'LRN':
-                # print(i)
                 keys = {}
                 layer = writecaffe.LRNLayer()
                 layer.name = i.name + TAG
                 for j in i.outputs:
                     layer.top.append(self.get_realname(j.name))
-                    # print(j.shape[0])
                     self.toplist.append(self.get_realname(j.name))
-                    # print(j)
-                    # print(j.name)
                 for j in i.inputs:
-                    # print(j.name)
                     if self.get_realname(j.name) not in self.toplist:
                         continue
                     layer.bottom.append(self.get_realname(j.name))
@@ -816,7 +744,6 @@ class Tensorflow2Caffe(object):
                     layer.reshape_param.append(keys)
                     self.layers.append(layer)
                     continue
-            # print('pre',Prelu_index)
             if i.type == Prelu_dict[Prelu_index] and Prelu_index >= 1:
                 Prelu_index += 1
                 if Prelu_index == 4:
@@ -836,39 +763,34 @@ class Tensorflow2Caffe(object):
             else:
                 Prelu_index = 0
                 prelu_alphas_name = ''
-            if i.type == Batch_normal_dict[Batch_normal_index]:
-                Batch_normal_index += 1
-                if Batch_normal_index == 1:
+            if i.type == Batch_normal_dict[batch_normal_index]:
+                batch_normal_index += 1
+                if batch_normal_index == 1:
                     if len(i.inputs) == 2:
                         moving_variance = i.inputs[0].name
                         esp_operation_name = i.inputs[1].name
 
-                if Batch_normal_index == 5:
+                if batch_normal_index == 5:
                     if len(i.inputs) == 2:
                         moving_mean = i.inputs[0].name
-                if Batch_normal_index == 3:
+                if batch_normal_index == 3:
                     if len(i.inputs) == 2:
                         gamma_name = i.inputs[1].name
-                if Batch_normal_index == 6:
+                if batch_normal_index == 6:
                     if len(i.inputs) == 2:
                         belta_name = i.inputs[0].name
-                if Batch_normal_index >= 7:
-                    Batch_normal_index = 0
+                if batch_normal_index >= 7:
+                    batch_normal_index = 0
                     keys = {}
                     layer = writecaffe.BatchnormalLayer()
                     layer.name = i.name + TAG
                     for j in i.outputs:
                         layer.top.append(self.get_realname('bn_' + j.name.encode()))
-
-                        # print(j.shape[0])
                         self.toplist.append(self.get_realname('bn_' + j.name.encode()))
-                        # print(j)
-                        # print(j.name)
                     for j in i.inputs:
                         if self.get_realname(j.name) not in self.toplist:
                             continue
                         layer.bottom.append(self.get_realname(j.name))
-                    # layer.relu_param.append(keys)
                     try:
                         mean_ = graph.get_tensor_by_name(moving_mean)
                         variance_ = graph.get_tensor_by_name(moving_variance)
@@ -925,7 +847,7 @@ class Tensorflow2Caffe(object):
                     self.layers.append(layer)
                     continue
             else:
-                Batch_normal_index = 0
+                batch_normal_index = 0
                 belta_name = ''
                 gamma_name = ''
                 moving_variance = ''
@@ -1082,8 +1004,6 @@ class Tensorflow2Caffe(object):
                                 for n in range(W):
                                     v_4d[:, :, m, n] = v_4d_temp[:, :, H - m - 1, W - n - 1]
                         net.params[caffe_var_name][var_site].data[:, :, :, :] = v_4d[:, :, :, :]
-
-            print(self.weight2operation)
             for param in caffemodel_params:
                 for i in self.weight2operation.keys():
                     if param in self.weight2operation[i]:
